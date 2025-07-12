@@ -1,0 +1,371 @@
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+import os
+import random
+import string
+import datetime
+
+def generate_compose():
+    # 获取网络模式
+    network_mode = network_var.get()
+    
+    # 获取端口设置
+    nginx_port = nginx_port_entry.get() or "3000"
+    app_port = app_port_entry.get() or "3001"
+    
+    # 获取卷映射
+    volumes = []
+    vol_mappings = [
+        (storage1_local_entry.get(), storage1_container_entry.get() or "/volume1"),
+        (storage2_local_entry.get(), storage2_container_entry.get() or "/volume2"),
+        (config_entry.get(), "/config"),
+        (core_entry.get(), "/moviepilot/.cache/ms-playwright"),
+        (qb_backup_entry.get(), "/BT_backup")
+    ]
+    
+    for local_path, container_path in vol_mappings:
+        if local_path.strip():
+            if container_path == "/BT_backup":
+                volumes.append(f"            # - '{local_path}:{container_path}'")
+            else:
+                volumes.append(f"            - '{local_path}:{container_path}'")
+    
+    # 固定卷映射
+    volumes.append("            - '/var/run/docker.sock:/var/run/docker.sock:ro'")
+    
+    # 获取环境变量
+    env_vars = []
+    env_settings = [
+        (f"NGINX_PORT={nginx_port}", "NGINX端口"),
+        (f"PORT={app_port}", "应用端口"),
+        (f"PUID={puid_entry.get() or '1026'}", "用户ID"),
+        (f"PGID={pgid_entry.get() or '100'}", "用户组ID"),
+        (f"UMASK={umask_entry.get() or '022'}", "文件掩码"),
+        (f"TZ={tz_entry.get() or 'Asia/Shanghai'}", "时区"),
+        (f"MOVIEPILOT_AUTO_UPDATE={update_var.get()}", "自动更新"),
+        (f"PROXY_HOST={proxy_entry.get()}", "代理地址"),
+        (f"AUTH_SITE={auth_site_var.get()}", "认证站点"),
+        (f"IYUU_SIGN={iyuu_entry.get()}", "IYUU令牌"),
+        (f"SUPERUSER={superuser_entry.get() or 'admin'}", "管理员用户名"),
+        (f"SUPERPASS={superpass_entry.get() or generate_password(12)}", "管理员密码")
+    ]
+    
+    for env, _ in env_settings:
+        if env.split("=")[1].strip():
+            env_vars.append(f"            - '{env}'")
+    
+    # 可选环境变量
+    if tmdb_key_entry.get():
+        env_vars.append(f"            # - 'TMDB_API_KEY={tmdb_key_entry.get()}'")
+    if api_token_var.get():
+        token = generate_password(16)
+        env_vars.append(f"            # - 'API_TOKEN={token}'  # 系统自动生成了API令牌")
+    if auth_enable_var.get():
+        env_vars.append("            # - 'AUXILIARY_AUTH_ENABLE=true'")
+    
+    # 生成Compose文件内容
+    compose_content = f"""# 自动生成的Docker Compose配置文件
+# 生成时间: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+# MoviePilot 配置
+
+services:
+
+    moviepilot:
+        image: jxxghp/moviepilot-v2:latest
+        container_name: moviepilot-v2
+        hostname: moviepilot-v2
+        network_mode: {network_mode} # 网络模式
+        restart: always
+        stdin_open: true
+        tty: true
+"""
+
+    # 添加端口映射（如果不是host模式）
+    if network_mode != "host":
+        compose_content += f"""        ports:
+            - '{nginx_port}:{nginx_port}'
+            - '{app_port}:{app_port}'
+"""
+
+    # 添加卷映射
+    compose_content += f"""        volumes:
+{chr(10).join(volumes)}
+"""
+
+    # 添加环境变量
+    compose_content += f"""        environment:
+{chr(10).join(env_vars)}
+"""
+
+    # 在文本区域显示结果
+    result_text.delete(1.0, tk.END)
+    result_text.insert(tk.END, compose_content)
+    
+    # 启用保存按钮
+    save_button.config(state=tk.NORMAL)
+
+def generate_password(length=12):
+    """生成随机密码"""
+    chars = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(random.choice(chars) for _ in range(length))
+
+def save_compose_file():
+    """保存生成的compose文件"""
+    content = result_text.get(1.0, tk.END)
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".yml",
+        filetypes=[("YAML files", "*.yml"), ("All files", "*.*")],
+        initialfile="docker-compose.yml"
+    )
+    
+    if file_path:
+        try:
+            with open(file_path, "w") as f:
+                f.write(content)
+            messagebox.showinfo("保存成功", f"文件已保存到:\n{file_path}")
+        except Exception as e:
+            messagebox.showerror("保存失败", f"保存文件时出错:\n{str(e)}")
+
+def toggle_ports(*args):
+    """根据网络模式切换端口输入框状态"""
+    if network_var.get() == "host":
+        nginx_port_entry.config(state=tk.DISABLED)
+        app_port_entry.config(state=tk.DISABLED)
+    else:
+        nginx_port_entry.config(state=tk.NORMAL)
+        app_port_entry.config(state=tk.NORMAL)
+
+# 创建主窗口
+root = tk.Tk()
+root.title("MoviePilot Compose 配置生成工具")
+root.geometry("1000x850")
+root.resizable(True, True)
+
+# 设置样式
+style = ttk.Style()
+style.configure("TFrame", padding=6)
+style.configure("TLabel", padding=3, font=("Arial", 10))
+style.configure("TButton", padding=5, font=("Arial", 10))
+style.configure("Bold.TLabel", font=("Arial", 10, "bold"))
+
+# 创建带滚动条的画布
+canvas = tk.Canvas(root)
+scrollbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
+scrollable_frame = ttk.Frame(canvas)
+
+scrollable_frame.bind(
+    "<Configure>",
+    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+)
+
+canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+canvas.configure(yscrollcommand=scrollbar.set)
+
+canvas.pack(side="left", fill="both", expand=True)
+scrollbar.pack(side="right", fill="y")
+
+# 网络配置部分
+network_frame = ttk.LabelFrame(scrollable_frame, text="网络配置", padding=10)
+network_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+ttk.Label(network_frame, text="网络模式:", style="Bold.TLabel").grid(row=0, column=0, sticky="w")
+network_var = tk.StringVar(value="host")
+network_combo = ttk.Combobox(
+    network_frame, 
+    textvariable=network_var, 
+    values=["host", "bridge"],
+    state="readonly",
+    width=10
+)
+network_combo.grid(row=0, column=1, sticky="w", padx=5)
+network_var.trace("w", toggle_ports)
+
+ttk.Label(network_frame, text="NGINX 端口:").grid(row=1, column=0, sticky="w")
+nginx_port_entry = ttk.Entry(network_frame, width=10)
+nginx_port_entry.grid(row=1, column=1, sticky="w", padx=5)
+nginx_port_entry.insert(0, "3000")
+
+ttk.Label(network_frame, text="应用端口:").grid(row=1, column=2, sticky="w", padx=(20,0))
+app_port_entry = ttk.Entry(network_frame, width=10)
+app_port_entry.grid(row=1, column=3, sticky="w", padx=5)
+app_port_entry.insert(0, "3001")
+
+# 卷映射配置 - 修改为存储位置路径
+volumes_frame = ttk.LabelFrame(scrollable_frame, text="卷映射配置", padding=10)
+volumes_frame.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+# 存储位置路径1
+ttk.Label(volumes_frame, text="存储位置路径1 (本地):").grid(row=0, column=0, sticky="w")
+storage1_local_entry = ttk.Entry(volumes_frame, width=40)
+storage1_local_entry.grid(row=0, column=1, sticky="we", padx=5, pady=2)
+storage1_local_entry.insert(0, "/volume1")
+
+ttk.Label(volumes_frame, text="容器内路径:").grid(row=0, column=2, sticky="w", padx=(10,0))
+storage1_container_entry = ttk.Entry(volumes_frame, width=20)
+storage1_container_entry.grid(row=0, column=3, sticky="w", padx=5, pady=2)
+storage1_container_entry.insert(0, "/volume1")
+
+# 存储位置路径2
+ttk.Label(volumes_frame, text="存储位置路径2 (本地):").grid(row=1, column=0, sticky="w")
+storage2_local_entry = ttk.Entry(volumes_frame, width=40)
+storage2_local_entry.grid(row=1, column=1, sticky="we", padx=5, pady=2)
+storage2_local_entry.insert(0, "/volume2")
+
+ttk.Label(volumes_frame, text="容器内路径:").grid(row=1, column=2, sticky="w", padx=(10,0))
+storage2_container_entry = ttk.Entry(volumes_frame, width=20)
+storage2_container_entry.grid(row=1, column=3, sticky="w", padx=5, pady=2)
+storage2_container_entry.insert(0, "/volume2")
+
+# 配置目录
+ttk.Label(volumes_frame, text="配置目录 (本地):").grid(row=2, column=0, sticky="w")
+config_entry = ttk.Entry(volumes_frame, width=40)
+config_entry.grid(row=2, column=1, sticky="we", padx=5, pady=2)
+config_entry.insert(0, "/volume1/docker/moviepilot-v2/config")
+
+ttk.Label(volumes_frame, text="容器内路径: /config (固定)").grid(row=2, column=2, columnspan=2, sticky="w", padx=(10,0))
+
+# Core目录
+ttk.Label(volumes_frame, text="Core 目录 (本地):").grid(row=3, column=0, sticky="w")
+core_entry = ttk.Entry(volumes_frame, width=40)
+core_entry.grid(row=3, column=1, sticky="we", padx=5, pady=2)
+core_entry.insert(0, "/volume1/docker/moviepilot-v2/core")
+
+ttk.Label(volumes_frame, text="容器内路径: /moviepilot/.cache/ms-playwright (固定)").grid(row=3, column=2, columnspan=2, sticky="w", padx=(10,0))
+
+# qBittorrent种子目录
+ttk.Label(volumes_frame, text="qBittorrent 种子目录 (本地, 可选):").grid(row=4, column=0, sticky="w")
+qb_backup_entry = ttk.Entry(volumes_frame, width=40)
+qb_backup_entry.grid(row=4, column=1, sticky="we", padx=5, pady=2)
+
+ttk.Label(volumes_frame, text="容器内路径: /BT_backup (固定)").grid(row=4, column=2, columnspan=2, sticky="w", padx=(10,0))
+
+# 环境变量配置
+env_frame = ttk.LabelFrame(scrollable_frame, text="环境变量配置", padding=10)
+env_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
+
+# 第一列
+ttk.Label(env_frame, text="用户ID (PUID):").grid(row=0, column=0, sticky="w")
+puid_entry = ttk.Entry(env_frame, width=15)
+puid_entry.grid(row=0, column=1, sticky="w", padx=5, pady=2)
+puid_entry.insert(0, "1026")
+
+ttk.Label(env_frame, text="用户组ID (PGID):").grid(row=1, column=0, sticky="w")
+pgid_entry = ttk.Entry(env_frame, width=15)
+pgid_entry.grid(row=1, column=1, sticky="w", padx=5, pady=2)
+pgid_entry.insert(0, "100")
+
+ttk.Label(env_frame, text="文件掩码 (UMASK):").grid(row=2, column=0, sticky="w")
+umask_entry = ttk.Entry(env_frame, width=15)
+umask_entry.grid(row=2, column=1, sticky="w", padx=5, pady=2)
+umask_entry.insert(0, "022")
+
+ttk.Label(env_frame, text="时区 (TZ):").grid(row=3, column=0, sticky="w")
+tz_entry = ttk.Entry(env_frame, width=15)
+tz_entry.grid(row=3, column=1, sticky="w", padx=5, pady=2)
+tz_entry.insert(0, "Asia/Shanghai")
+
+# 第二列
+ttk.Label(env_frame, text="自动更新:").grid(row=0, column=2, sticky="w", padx=(20,0))
+update_var = tk.StringVar(value="release")
+update_combo = ttk.Combobox(
+    env_frame, 
+    textvariable=update_var, 
+    values=["release", "beta", "dev"],
+    state="readonly",
+    width=12
+)
+update_combo.grid(row=0, column=3, sticky="w", padx=5)
+
+ttk.Label(env_frame, text="认证站点:").grid(row=1, column=2, sticky="w", padx=(20,0))
+auth_site_var = tk.StringVar(value="iyuu")
+auth_site_combo = ttk.Combobox(
+    env_frame, 
+    textvariable=auth_site_var, 
+    values=["iyuu", "ptp", "hdb", "custom"],
+    state="readonly",
+    width=12
+)
+auth_site_combo.grid(row=1, column=3, sticky="w", padx=5)
+
+ttk.Label(env_frame, text="代理地址:").grid(row=2, column=2, sticky="w", padx=(20,0))
+proxy_entry = ttk.Entry(env_frame, width=25)
+proxy_entry.grid(row=2, column=3, sticky="w", padx=5, pady=2)
+proxy_entry.insert(0, "http://192.168.2.99:7890")
+
+ttk.Label(env_frame, text="IYUU令牌:").grid(row=3, column=2, sticky="w", padx=(20,0))
+iyuu_entry = ttk.Entry(env_frame, width=25)
+iyuu_entry.grid(row=3, column=3, sticky="w", padx=5, pady=2)
+
+# 管理员账户
+admin_frame = ttk.LabelFrame(env_frame, text="管理员账户")
+admin_frame.grid(row=4, column=0, columnspan=4, sticky="ew", pady=10, padx=5)
+
+ttk.Label(admin_frame, text="管理员用户名:").grid(row=0, column=0, sticky="w")
+superuser_entry = ttk.Entry(admin_frame, width=15)
+superuser_entry.grid(row=0, column=1, sticky="w", padx=5, pady=2)
+superuser_entry.insert(0, "admin")
+
+ttk.Label(admin_frame, text="管理员密码 (仅记录):").grid(row=0, column=2, sticky="w", padx=(20,0))
+superpass_entry = ttk.Entry(admin_frame, width=20)
+superpass_entry.grid(row=0, column=3, sticky="w", padx=5, pady=2)
+superpass_entry.insert(0, "12345")
+
+# 可选配置
+optional_frame = ttk.LabelFrame(env_frame, text="可选配置")
+optional_frame.grid(row=5, column=0, columnspan=4, sticky="ew", pady=10, padx=5)
+
+ttk.Label(optional_frame, text="TMDB API Key:").grid(row=0, column=0, sticky="w")
+tmdb_key_entry = ttk.Entry(optional_frame, width=30)
+tmdb_key_entry.grid(row=0, column=1, sticky="we", padx=5, pady=2)
+
+api_token_var = tk.BooleanVar()
+api_token_cb = ttk.Checkbutton(
+    optional_frame, 
+    text="生成API令牌", 
+    variable=api_token_var
+)
+api_token_cb.grid(row=0, column=2, sticky="w", padx=(20,5))
+
+auth_enable_var = tk.BooleanVar()
+auth_enable_cb = ttk.Checkbutton(
+    optional_frame, 
+    text="启用辅助认证", 
+    variable=auth_enable_var
+)
+auth_enable_cb.grid(row=0, column=3, sticky="w", padx=5)
+
+# 按钮区域
+button_frame = ttk.Frame(scrollable_frame)
+button_frame.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
+
+generate_button = ttk.Button(
+    button_frame, 
+    text="生成 Compose 文件", 
+    command=generate_compose
+)
+generate_button.pack(side=tk.LEFT, padx=5)
+
+save_button = ttk.Button(
+    button_frame, 
+    text="保存到文件", 
+    command=save_compose_file,
+    state=tk.DISABLED
+)
+save_button.pack(side=tk.LEFT, padx=5)
+
+# 结果显示区域
+result_frame = ttk.LabelFrame(scrollable_frame, text="生成的 Docker Compose 配置", padding=10)
+result_frame.grid(row=4, column=0, padx=10, pady=10, sticky="nsew")
+
+result_text = tk.Text(result_frame, wrap=tk.WORD, height=20, font=("Courier New", 10))
+result_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+scrollbar_text = ttk.Scrollbar(result_frame, command=result_text.yview)
+scrollbar_text.pack(side=tk.RIGHT, fill=tk.Y)
+result_text.config(yscrollcommand=scrollbar_text.set)
+
+# 初始状态设置
+toggle_ports()
+
+# 启动主循环
+root.mainloop()
