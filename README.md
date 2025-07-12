@@ -4,7 +4,8 @@
 ## 📌 概述
 一个基于Python的图形界面工具，用于快速生成MoviePilot的Docker Compose配置文件。通过直观的界面简化配置过程，减少手动编辑YAML文件的错误。
 
-![界面截图](https://via.placeholder.com/800x500?text=MoviePilot+Config+Generator+UI)
+<img width="2031" height="1877" alt="image" src="https://github.com/user-attachments/assets/3821f938-af5b-4973-a2d7-0ce065963944" />
+
 
 ## ✨ 主要功能
 
