@@ -1,0 +1,29 @@
+name: Build EXE
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装依赖
+        run: pip install pyinstaller pillow pyautogui
+
+      - name: 构建 EXE
+        run: |
+          pyinstaller --onefile --windowed --name mpcomposer --add-data "screenshots;screenshots" run.py
+
+      - name: 上传 EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpcomposer
+          path: dist/mpcomposer.exe
