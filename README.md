@@ -1,4 +1,4 @@
-# mpcomposer v3.0
+# mpcomposer v3.1
 # MoviePilot Docker Compose 配置生成工具
 
 ## 📌 概述
@@ -6,30 +6,60 @@
 
 **v3.0 重大更新**：所有环境变量严格对应 MoviePilot `app/core/config.py` 源码，删除了旧版中虚构的变量（API_PORT、IYUU_SIGN 等），新增 v2.11.0 的下载路径管理、媒体库配置、CookieCloud 等模块。
 
-<img width="2031" height="1877" alt="image" src="https://github.com/user-attachments/assets/3821f938-af5b-4973-a2d7-0ce065963944" />
-<img width="1901" height="1705" alt="image" src="https://github.com/user-attachments/assets/923fef14-264a-4af5-9c4b-545565ce50d0" />
-<img width="1905" height="1045" alt="image" src="https://github.com/user-attachments/assets/08c65c98-8e13-46ea-88d7-96d5ac804685" />
-<img width="1977" height="1079" alt="image" src="https://github.com/user-attachments/assets/7fa1a1cf-2320-4f15-ad3d-fed9c30d9294" />
-<img width="979" height="545" alt="image" src="https://github.com/user-attachments/assets/ff97caf2-8132-4c52-a17b-7cb0d9d0f8ec" />
+**v3.1 更新**：修复 BT_BACKUP_DIR 注释问题、简化环境变量收集逻辑、卷映射默认路径改为飞牛 NAS 通用格式、镜像标签锁定 v2.11.0。
 
+<img src="screenshots/01_initial.png" alt="初始界面" width="800" />
+<img src="screenshots/02_expanded.png" alt="展开基本设置和媒体相关" width="800" />
+<img src="screenshots/03_scrolled.png" alt="展开更多分组并滚动" width="800" />
+<img src="screenshots/04_compose_result.png" alt="生成 Compose 结果" width="800" />
+<img src="screenshots/05_result_focus.png" alt="Compose 结果预览" width="800" />
 
 ## ✨ 主要功能
 
-### 🌐 网络配置
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| 网络模式 | Host或Bridge模式 | Host |
-| NGINX端口 | Web访问端口 | 3000 |
-| 应用端口 | 应用程序端口 | 3001 |
-| API端口 | 新增API端口 | 3002 |
+### 10 个配置分组（手风琴折叠）
 
-### 💾 存储卷映射
-```plaintext
-存储位置路径1 (本地) → [容器内路径]
-存储位置路径2 (本地) → [容器内路径]
-配置目录 (本地) → /config (固定)
-Core目录 (本地) → /moviepilot/.cache/ms-playwright (固定)
-qBittorrent种子目录 (可选) → /BT_backup (固定)
+| 分组 | 配置项数 | 说明 |
+|------|---------|------|
+| 🌐 基本设置 | 9 | 端口、管理员、域名、代理 |
+| 🎬 媒体相关 | 5 | TMDB、搜索、刮削来源 |
+| 📁 下载路径 (v2.11新增) | 5 | 按类型分别配置下载目录 |
+| 📚 媒体库配置 (v2.11新增) | 5 | 媒体库根目录和分类 |
+| ⬇️ 下载器配置 | 9 | qBittorrent / Transmission |
+| 🖥️ 媒体服务器 | 7 | Emby / Jellyfin / Plex |
+| 📢 通知渠道 | 6 | WebPush / 微信 / Telegram |
+| ☁️ CookieCloud | 4 | Cookie 同步 |
+| 🔧 高级选项 | 8 | GitHub、字幕、转移方式 |
+| 🐳 Docker安全上下文 | 3 | PUID、PGID、UMASK |
 
+### 网络模式
+- **Host** 模式（默认）：容器共享宿主机网络
+- **Bridge** 模式：端口映射 3000(Web) / 3001(API)
 
+### 卷映射
+- 配置目录 → `/config`
+- 媒体目录 → `/media`
+- 下载目录 → `/downloads`
+- BT 备份 → `/BT_backup`
+- Docker Socket → `/var/run/docker.sock` (只读)
 
+## 🚀 使用方式
+
+```bash
+python3 run
+# 或
+python3 run.py
+```
+
+1. 选择网络模式
+2. 展开分组，填写配置项
+3. 点击「生成 Compose 文件」
+4. 点击「保存到文件」或直接复制
+
+## 📦 依赖
+
+- Python 3.8+
+- tkinter（Python 自带）
+
+## 📄 许可证
+
+MIT
