@@ -1,8 +1,10 @@
-# mpcomposer
+# mpcomposer v3.0
 # MoviePilot Docker Compose 配置生成工具
 
 ## 📌 概述
-一个基于Python的图形界面工具，用于快速生成MoviePilot的Docker Compose配置文件。通过直观的界面简化配置过程，减少手动编辑YAML文件的错误。
+基于 Python tkinter 的图形界面工具，用于快速生成 MoviePilot v2.11.0 的 Docker Compose 配置文件。
+
+**v3.0 重大更新**：所有环境变量严格对应 MoviePilot `app/core/config.py` 源码，删除了旧版中虚构的变量（API_PORT、IYUU_SIGN 等），新增 v2.11.0 的下载路径管理、媒体库配置、CookieCloud 等模块。
 
 <img width="2031" height="1877" alt="image" src="https://github.com/user-attachments/assets/3821f938-af5b-4973-a2d7-0ce065963944" />
 <img width="1901" height="1705" alt="image" src="https://github.com/user-attachments/assets/923fef14-264a-4af5-9c4b-545565ce50d0" />
